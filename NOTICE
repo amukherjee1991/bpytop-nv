@@ -11,6 +11,8 @@ Modifications in bpytop-nv:
     Management Library (libnvidia-ml) via ctypes.
   - GPU-aware box layout, the "gpu" view preset and the [5] toggle key.
   - Config and log files moved to ~/.config/bpytop-nv.
+  - Packaged for pip as the bpytop_nv package, with bpytop's themes bundled
+    in bpytop_nv/bpytop-themes (unmodified, Apache License 2.0).
 
 The GPU view is inspired by nvtop (https://github.com/Syllo/nvtop), which is
 licensed under GPLv3. No nvtop source code is included in this project.

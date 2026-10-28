@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bpytop-nv"
+version = "0.1.0"
+description = "bpytop with an nvtop-style NVIDIA GPU box: CPU, GPU, memory, disks, network and processes in one terminal"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Arghya Mukherjee", email = "amukherjee1991@gmail.com" }]
+requires-python = ">=3.7"
+dependencies = ["psutil>=5.7.0"]
+keywords = ["monitor", "top", "bpytop", "nvtop", "nvidia", "gpu", "terminal", "tui", "nvml"]
+classifiers = [
+    "Environment :: Console :: Curses",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Monitoring",
+]
+
+[project.urls]
+Homepage = "https://github.com/amukherjee1991/bpytop-nv"
+Issues = "https://github.com/amukherjee1991/bpytop-nv/issues"
+Upstream = "https://github.com/aristocratos/bpytop"
+
+[project.scripts]
+bpytop-nv = "bpytop_nv:main"
+
+[tool.setuptools]
+packages = ["bpytop_nv"]
+license-files = ["LICENSE", "NOTICE"]
+
+[tool.setuptools.package-data]
+bpytop_nv = ["bpytop-themes/*.theme"]

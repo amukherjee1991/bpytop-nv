@@ -55,7 +55,8 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "1.0.68"
+VERSION: str = "0.1.0"
+BPYTOP_VERSION: str = "1.0.68"
 
 #? Argument parser ------------------------------------------------------------------------------->
 args = argparse.ArgumentParser()
@@ -66,7 +67,7 @@ args.add_argument("--debug",			action="store_true", 			help = "start with loglev
 stdargs = args.parse_args()
 
 if stdargs.version:
-	print(f'bpytop-nv version: {VERSION}\n'
+	print(f'bpytop-nv version: {VERSION} (based on bpytop {BPYTOP_VERSION})\n'
 		f'psutil version: {".".join(str(x) for x in psutil.version_info)}')
 	raise SystemExit(0)
 
@@ -88,7 +89,7 @@ BANNER_SRC: List[Tuple[str, str, str]] = [
 #*?This is the template used to create the config file
 DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + '''
 
-#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop/themes", "Default" for builtin default theme.
+#* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop-nv/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
 color_theme="$color_theme"
 
@@ -233,10 +234,10 @@ show_battery=$show_battery
 #* Show init screen at startup, the init screen is purely cosmetical
 show_init=$show_init
 
-#* Enable check for new version from github.com/aristocratos/bpytop at start.
+#* Enable check for new version from github.com/amukherjee1991/bpytop-nv at start.
 update_check=$update_check
 
-#* Set loglevel for "~/.config/bpytop/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
+#* Set loglevel for "~/.config/bpytop-nv/error.log" levels are: "ERROR" "WARNING" "INFO" "DEBUG".
 #* The level set includes all lower levels, i.e. "DEBUG" will show all logging info.
 log_level=$log_level
 ''')
@@ -2049,7 +2050,7 @@ class GpuBox(Box):
 	height_p = 30
 	width_p = 100
 	min_w: int = 60
-	min_h: int = 8
+	min_h: int = 6
 	x = 1
 	y = 1
 	resized: bool = True
@@ -2071,8 +2072,10 @@ class GpuBox(Box):
 			cls.height = Term.height - Box._b_cpu_h
 		else:
 			cls.height = round(Term.height * (cls.height_p + 10 * (min(gpu_count, 3) - 1)) / 100)
-			if cls.height < 2 + 6 * gpu_count: cls.height = 2 + 6 * gpu_count
-			if cls.height > Term.height - Box._b_cpu_h - 6: cls.height = max(Term.height - Box._b_cpu_h - 6, 8)
+			#* Leave the boxes below at least their minimum height, shrink to a compact gpu box on small terminals
+			below_min: int = ProcBox.min_h if "proc" in cls.boxes else MemBox.min_h
+			if cls.height > Term.height - Box._b_cpu_h - below_min: cls.height = Term.height - Box._b_cpu_h - below_min
+			if cls.height < 2 + 4 * gpu_count: cls.height = 2 + 4 * gpu_count
 		Box._b_cpu_h += cls.height
 
 		#* Split the box into one horizontal section per gpu, each with graphs, a stats sub box and a process list
@@ -4434,7 +4437,7 @@ class Menu:
 				banner = (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
 					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
 				if UpdateChecker.version != VERSION:
-					banner += f'{Mv.to(Term.height, 1)}{Fx.b}{THEME.title}New release {UpdateChecker.version} available at https://github.com/aristocratos/bpytop{Fx.ub}{Term.fg}'
+					banner += f'{Mv.to(Term.height, 1)}{Fx.b}{THEME.title}New release {UpdateChecker.version} available at https://github.com/amukherjee1991/bpytop-nv{Fx.ub}{Term.fg}'
 				cy = 0
 				for name, menu in cls.menus.items():
 					ypos = Term.height // 2 - 2 + cy
@@ -4533,7 +4536,7 @@ class Menu:
 			"Selected (Mouse 1)" : "Show detailed information for selected process.",
 			"(Mouse scroll)" : "Scrolls any scrollable list/text under cursor.",
 			"(Esc, shift+m)" : "Toggles main menu.",
-			"(m)" : "Cycle view presets, order: full->stat->proc->gpu->user.",
+			"(m)" : "Cycle presets: full->stat->proc->gpu->user.",
 			"(1)" : "Toggle CPU box.",
 			"(2)" : "Toggle MEM box.",
 			"(3)" : "Toggle NET box.",
@@ -4568,7 +4571,7 @@ class Menu:
 			"Selected (shift+i)" : "Interrupt selected process with SIGINT - 2.",
 			"_1" : " ",
 			"_2" : "For bug reporting and project updates, visit:",
-			"_3" : "https://github.com/aristocratos/bpytop",
+			"_3" : "https://github.com/amukherjee1991/bpytop-nv",
 		}
 
 		while not cls.close:
@@ -4686,7 +4689,7 @@ class Menu:
 					'',
 					'Choose from all theme files in',
 					'"/usr/[local/]share/bpytop/themes" and',
-					'"~/.config/bpytop/themes".',
+					'"~/.config/bpytop-nv/themes".',
 					'',
 					'"Default" for builtin default theme.',
 					'User themes are prefixed by a plus sign "+".',
@@ -4762,7 +4765,7 @@ class Menu:
 					'Check for updates at start.',
 					'',
 					'Checks for latest version from:',
-					'https://github.com/aristocratos/bpytop'],
+					'https://github.com/amukherjee1991/bpytop-nv'],
 				"log_level" : [
 					'Set loglevel for error.log',
 					'',
@@ -5427,7 +5430,7 @@ class UpdateChecker:
 	@classmethod
 	def _checker(cls):
 		try:
-			with urllib.request.urlopen("https://github.com/aristocratos/bpytop/raw/master/bpytop.py", timeout=5) as source: # type: ignore
+			with urllib.request.urlopen("https://github.com/amukherjee1991/bpytop-nv/raw/main/bpytop_nv/__init__.py", timeout=5) as source: # type: ignore
 				for line in source:
 					line = line.decode("utf-8")
 					if line.startswith("VERSION: str ="):
@@ -5438,8 +5441,8 @@ class UpdateChecker:
 		else:
 			if cls.version != VERSION and which("notify-send"):
 				try:
-					subprocess.run(["notify-send", "-u", "normal", "BpyTop Update!",
-						f'New version of BpyTop available!\nCurrent version: {VERSION}\nNew version: {cls.version}\nDownload at github.com/aristocratos/bpytop',
+					subprocess.run(["notify-send", "-u", "normal", "bpytop-nv Update!",
+						f'New version of bpytop-nv available!\nCurrent version: {VERSION}\nNew version: {cls.version}\nUpgrade with: pip install -U bpytop-nv',
 						"-i", "update-notifier", "-t", "10000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 				except Exception as e:
 					errlog.exception(f'{e}')
