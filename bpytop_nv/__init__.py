@@ -78,16 +78,16 @@ DEBUG: bool = stdargs.debug
 #? Variables ------------------------------------------------------------------------------------->
 
 BANNER_SRC: List[Tuple[str, str, str]] = [
-	("#ffa50a", "#0fd7ff", "██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ██████╗"),
-	("#f09800", "#00bfe6", "██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔═══██╗██╔══██╗"),
-	("#db8b00", "#00a6c7", "██████╔╝██████╔╝ ╚████╔╝    ██║   ██║   ██║██████╔╝"),
-	("#c27b00", "#008ca8", "██╔══██╗██╔═══╝   ╚██╔╝     ██║   ██║   ██║██╔═══╝ "),
-	("#a86b00", "#006e85", "██████╔╝██║        ██║      ██║   ╚██████╔╝██║"),
-	("#000000", "#000000", "╚═════╝ ╚═╝        ╚═╝      ╚═╝    ╚═════╝ ╚═╝"),
+	("#ffa50a", "#0fd7ff", "██████╗ ██████╗ ██╗   ██╗████████╗ ██████╗ ██████╗       ███╗   ██╗██╗   ██╗"),
+	("#f09800", "#00bfe6", "██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔═══██╗██╔══██╗      ████╗  ██║██║   ██║"),
+	("#db8b00", "#00a6c7", "██████╔╝██████╔╝ ╚████╔╝    ██║   ██║   ██║██████╔╝█████╗██╔██╗ ██║██║   ██║"),
+	("#c27b00", "#008ca8", "██╔══██╗██╔═══╝   ╚██╔╝     ██║   ██║   ██║██╔═══╝ ╚════╝██║╚██╗██║╚██╗ ██╔╝"),
+	("#a86b00", "#006e85", "██████╔╝██║        ██║      ██║   ╚██████╔╝██║           ██║ ╚████║ ╚████╔╝"),
+	("#000000", "#000000", "╚═════╝ ╚═╝        ╚═╝      ╚═╝    ╚═════╝ ╚═╝           ╚═╝  ╚═══╝  ╚═══╝"),
 ]
 
 #*?This is the template used to create the config file
-DEFAULT_CONF: Template = Template(f'#? Config file for bpytop v. {VERSION}' + '''
+DEFAULT_CONF: Template = Template(f'#? Config file for bpytop-nv v. {VERSION}' + '''
 
 #* Color theme, looks for a .theme file in "/usr/[local/]share/bpytop/themes" and "~/.config/bpytop-nv/themes", "Default" for builtin default theme.
 #* Prefix name by a plus sign (+) for a theme located in user themes folder, i.e. color_theme="+monokai"
@@ -106,7 +106,7 @@ shown_boxes="$shown_boxes"
 update_ms=$update_ms
 
 #* Processes update multiplier, sets how often the process list is updated as a multiplier of "update_ms".
-#* Set to 2 or higher to greatly decrease bpytop cpu usage. (Only integers)
+#* Set to 2 or higher to greatly decrease bpytop-nv cpu usage. (Only integers)
 proc_update_mult=$proc_update_mult
 
 #* Processes sorting, "pid" "program" "arguments" "threads" "user" "memory" "cpu lazy" "cpu responsive",
@@ -522,7 +522,7 @@ class Config:
 			self.info.append(f'Config file malformatted or missing, will be recreated on exit!')
 		elif conf["version"] != VERSION:
 			self.recreate = True
-			self.info.append(f'Config file version and bpytop version mismatch, will be recreated on exit!')
+			self.info.append(f'Config file version and bpytop-nv version mismatch, will be recreated on exit!')
 		for key in self.keys:
 			if key in conf.keys() and conf[key] != "_error_":
 				setattr(self, key, conf[key])
@@ -544,10 +544,10 @@ class Config:
 		conf_file: str = ""
 		if os.path.isfile(self.config_file):
 			conf_file = self.config_file
-		elif SYSTEM == "BSD" and os.path.isfile("/usr/local/etc/bpytop.conf"):
-			conf_file = "/usr/local/etc/bpytop.conf"
-		elif SYSTEM != "BSD" and os.path.isfile("/etc/bpytop.conf"):
-			conf_file = "/etc/bpytop.conf"
+		elif SYSTEM == "BSD" and os.path.isfile("/usr/local/etc/bpytop-nv.conf"):
+			conf_file = "/usr/local/etc/bpytop-nv.conf"
+		elif SYSTEM != "BSD" and os.path.isfile("/etc/bpytop-nv.conf"):
+			conf_file = "/etc/bpytop-nv.conf"
 		else:
 			return new_config
 		try:
@@ -623,7 +623,7 @@ try:
 	else:
 		errlog.setLevel(getattr(logging, CONFIG.log_level))
 		DEBUG = CONFIG.log_level == "DEBUG"
-	errlog.info(f'New instance of bpytop version {VERSION} started with pid {os.getpid()}')
+	errlog.info(f'New instance of bpytop-nv version {VERSION} started with pid {os.getpid()}')
 	errlog.info(f'Loglevel set to {"DEBUG" if DEBUG else CONFIG.log_level}')
 	errlog.debug(f'Using psutil version {".".join(str(x) for x in psutil.version_info)}')
 	errlog.debug(f'CMD: {" ".join(sys.argv)}')
@@ -1380,7 +1380,7 @@ class Theme:
 		return new_theme
 
 class Banner:
-	'''Holds the bpytop banner, .draw(line, [col=0], [center=False], [now=False])'''
+	'''Holds the bpytop-nv banner, .draw(line, [col=0], [center=False], [now=False])'''
 	out: List[str] = []
 	c_color: str = ""
 	length: int = 0
@@ -1393,7 +1393,7 @@ class Banner:
 			line_dark = Color.fg(f'#{80 - num * 6}')
 			for n, letter in enumerate(line):
 				if letter == "█" and c_color != line_color:
-					if 5 < n < 25: c_color = line_color2
+					if 5 < n < 25 or n > 56: c_color = line_color2
 					else: c_color = line_color
 					out_var += c_color
 				elif letter == " ":
@@ -1756,9 +1756,9 @@ class Box:
 	def empty_bg(cls) -> str:
 		return (f'{Term.clear}' +
 				(f'{Banner.draw(Term.height // 2 - 10, center=True)}'
-				f'{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}[esc] Menu'
-				f'{Mv.r(25)}{Fx.i}Version: {VERSION}{Fx.ui}' if Term.height > 22 else "") +
-				f'{Mv.d(1)}{Mv.l(34)}{Fx.b}All boxes hidden!'
+				f'{Mv.d(1)}{Mv.l(74)}{Colors.black_bg}{Colors.default}{Fx.b}[esc] Menu'
+				f'{Mv.r(Banner.length - 19 - len(VERSION))}{Fx.i}Version: {VERSION}{Fx.ui}' if Term.height > 22 else "") +
+				f'{Mv.d(1)}{Mv.l(Banner.length // 2 + 8)}{Fx.b}All boxes hidden!'
 				f'{Mv.d(1)}{Mv.l(17)}{Fx.b}[1] {Fx.ub}Toggle CPU box'
 				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[2] {Fx.ub}Toggle MEM box'
 				f'{Mv.d(1)}{Mv.l(18)}{Fx.b}[3] {Fx.ub}Toggle NET box'
@@ -4434,8 +4434,8 @@ class Menu:
 		while not cls.close:
 			key = ""
 			if cls.resized:
-				banner = (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
-					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
+				banner = (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(74)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
+					f'{Mv.r(Banner.length - 14 - len(VERSION))}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
 				if UpdateChecker.version != VERSION:
 					banner += f'{Mv.to(Term.height, 1)}{Fx.b}{THEME.title}New release {UpdateChecker.version} available at https://github.com/amukherjee1991/bpytop-nv{Fx.ub}{Term.fg}'
 				cy = 0
@@ -4578,8 +4578,8 @@ class Menu:
 			key = ""
 			if cls.resized:
 				y = 8 if Term.height < len(help_items) + 10 else Term.height // 2 - len(help_items) // 2 + 4
-				out_misc = (f'{Banner.draw(y-7, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
-					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
+				out_misc = (f'{Banner.draw(y-7, center=True)}{Mv.d(1)}{Mv.l(74)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
+					f'{Mv.r(Banner.length - 14 - len(VERSION))}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
 				x = Term.width//2-36
 				h, w = Term.height-2-y, 72
 				if len(help_items) > h:
@@ -4986,7 +4986,7 @@ class Menu:
 					'Sets how often the process list is updated as',
 					'a multiplier of "update_ms".',
 					'',
-					'Set to 2 or higher to greatly decrease bpytop',
+					'Set to 2 or higher to greatly decrease bpytop-nv',
 					'cpu usage. (Only integers)'],
 				"proc_sorting" : [
 					'Processes sorting option.',
@@ -5054,8 +5054,8 @@ class Menu:
 				option_items = categories[cat_list[cat_int]]
 				option_len: int = len(option_items) * 2
 				y = 12 if Term.height < max_opt_len + 13 else Term.height // 2 - max_opt_len // 2 + 7
-				out_misc = (f'{Banner.draw(y-10, center=True)}{Mv.d(1)}{Mv.l(46)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
-					f'{Mv.r(30)}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
+				out_misc = (f'{Banner.draw(y-10, center=True)}{Mv.d(1)}{Mv.l(74)}{Colors.black_bg}{Colors.default}{Fx.b}← esc'
+					f'{Mv.r(Banner.length - 14 - len(VERSION))}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}')
 				x = Term.width//2-38
 				x2 = x + 27
 				h, w, w2 = min(Term.height-1-y, option_len), 26, 50
@@ -5461,7 +5461,7 @@ class Init:
 		Draw.buffer("initbg", z=10)
 		for i in range(51):
 			for _ in range(2): cls.initbg_colors.append(Color.fg(i, i, i))
-		Draw.buffer("banner", (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(11)}{Colors.black_bg}{Colors.default}'
+		Draw.buffer("banner", (f'{Banner.draw(Term.height // 2 - 10, center=True)}{Mv.d(1)}{Mv.l(27)}{Colors.black_bg}{Colors.default}'
 				f'{Fx.b}{Fx.i}Version: {VERSION}{Fx.ui}{Fx.ub}{Term.bg}{Term.fg}{Color.fg("#50")}'), z=2)
 		for _i in range(7):
 			perc = f'{str(round((_i + 1) * 14 + 2)) + "%":>5}'
@@ -5669,7 +5669,7 @@ def clean_quit(errcode: int = 0, errmsg: str = "", thread: bool = False):
 		errlog.info(f'Exiting. Runtime {timedelta(seconds=round(time() - SELF_START, 0))} \n')
 	else:
 		errlog.warning(f'Exiting with errorcode ({errcode}). Runtime {timedelta(seconds=round(time() - SELF_START, 0))} \n')
-		if not errmsg: errmsg = f'Bpytop exited with errorcode ({errcode}). See {CONFIG_DIR}/error.log for more information!'
+		if not errmsg: errmsg = f'bpytop-nv exited with errorcode ({errcode}). See {CONFIG_DIR}/error.log for more information!'
 	if errmsg: print(errmsg)
 
 	raise SystemExit(errcode)
