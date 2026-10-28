@@ -1,0 +1,19 @@
+bpytop-nv
+Copyright 2026 Arghya Mukherjee
+
+This product is a modified version of bpytop:
+  bpytop - https://github.com/aristocratos/bpytop
+  Copyright 2021 Aristocratos (jakob@qvantnet.com)
+  Licensed under the Apache License, Version 2.0
+
+Modifications in bpytop-nv:
+  - Added a GPU box and GPU collector for NVIDIA GPUs, using the NVIDIA
+    Management Library (libnvidia-ml) via ctypes.
+  - GPU-aware box layout, the "gpu" view preset and the [5] toggle key.
+  - Config and log files moved to ~/.config/bpytop-nv.
+
+The GPU view is inspired by nvtop (https://github.com/Syllo/nvtop), which is
+licensed under GPLv3. No nvtop source code is included in this project.
+
+NVIDIA and GeForce are trademarks of NVIDIA Corporation. This project is not
+affiliated with or endorsed by NVIDIA.
