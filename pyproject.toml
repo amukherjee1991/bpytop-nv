@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bpytop-nv"
-version = "0.1.0"
+version = "26.10"
 description = "bpytop with an nvtop-style NVIDIA GPU box: CPU, GPU, memory, disks, network and processes in one terminal"
 readme = "README.md"
 license = { text = "Apache-2.0" }

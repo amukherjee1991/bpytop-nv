@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "0.1.0"
+VERSION: str = "26.10"
 BPYTOP_VERSION: str = "1.0.68"
 
 #? Argument parser ------------------------------------------------------------------------------->
