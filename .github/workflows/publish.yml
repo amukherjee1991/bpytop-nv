@@ -1,0 +1,63 @@
+name: Build and publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check versions match
+        run: |
+          pyproject=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          app=$(grep -m1 '^VERSION: str = ' bpytop_nv/__init__.py | cut -d'"' -f2)
+          echo "pyproject.toml: $pyproject, bpytop_nv/__init__.py: $app"
+          [ "$pyproject" = "$app" ] || { echo "::error::Version mismatch between pyproject.toml and bpytop_nv/__init__.py"; exit 1; }
+          if [ "${{ github.event_name }}" = "release" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            [ "$tag" = "$pyproject" ] || { echo "::error::Release tag $GITHUB_REF_NAME does not match version $pyproject"; exit 1; }
+          fi
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          twine check --strict dist/*
+
+      - name: Smoke test the wheel
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/bpytop-nv --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/bpytop-nv/
+    permissions:
+      id-token: write # Trusted Publishing, no API token needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
