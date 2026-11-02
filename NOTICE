@@ -8,7 +8,9 @@ This product is a modified version of bpytop:
 
 Modifications in bpytop-nv:
   - Added a GPU box and GPU collector for NVIDIA GPUs, using the NVIDIA
-    Management Library (libnvidia-ml) via ctypes.
+    Management Library (libnvidia-ml) via ctypes, for AMD Radeon GPUs using
+    the amdgpu driver's sysfs files and drm fdinfo, and for Apple Silicon
+    using the macOS IORegistry (ioreg).
   - GPU-aware box layout, the "gpu" view preset and the [5] toggle key.
   - Config and log files moved to ~/.config/bpytop-nv.
   - Packaged for pip as the bpytop_nv package, with bpytop's themes bundled
@@ -17,5 +19,7 @@ Modifications in bpytop-nv:
 The GPU view is inspired by nvtop (https://github.com/Syllo/nvtop), which is
 licensed under GPLv3. No nvtop source code is included in this project.
 
-NVIDIA and GeForce are trademarks of NVIDIA Corporation. This project is not
-affiliated with or endorsed by NVIDIA.
+NVIDIA and GeForce are trademarks of NVIDIA Corporation. AMD and Radeon are
+trademarks of Advanced Micro Devices, Inc. Apple and Apple Silicon are
+trademarks of Apple Inc. This project is not affiliated with or endorsed by
+NVIDIA, AMD or Apple.

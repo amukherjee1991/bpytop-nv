@@ -1,6 +1,6 @@
 # bpytop-nv
 
-[bpytop](https://github.com/aristocratos/bpytop) with an [nvtop](https://github.com/Syllo/nvtop)-style GPU box for NVIDIA cards. You get CPU, GPU, memory, disks, network and processes in one terminal view.
+[bpytop](https://github.com/aristocratos/bpytop) with an [nvtop](https://github.com/Syllo/nvtop)-style GPU box for NVIDIA and AMD Radeon cards and Apple Silicon. You get CPU, GPU, memory, disks, network and processes in one terminal view.
 
 ![bpytop-nv full view](https://raw.githubusercontent.com/amukherjee1991/bpytop-nv/main/docs/screenshots/full.png)
 
@@ -33,18 +33,21 @@ python3 -m bpytop_nv
 
 ### Requirements
 
-- Linux
+- Linux, or macOS for Apple Silicon
 - Python 3.7+
 - [psutil](https://github.com/giampaolo/psutil), installed automatically by pip
-- The NVIDIA proprietary driver for the GPU box. It ships `libnvidia-ml.so.1`. You don't need `pynvml` or `nvidia-smi`.
+- For the GPU box, one of:
+  - **NVIDIA**: the proprietary driver, which ships `libnvidia-ml.so.1`. You don't need `pynvml` or `nvidia-smi`.
+  - **AMD Radeon**: the in-kernel `amdgpu` driver. Per-process GPU usage needs Linux 5.19 or newer.
+  - **Apple Silicon**: nothing extra. Data comes from `ioreg`, which ships with macOS, so no `sudo` is needed.
 
-If no NVIDIA GPU or driver is found, the GPU box stays hidden and everything else works like stock bpytop.
+If no supported GPU is found, the GPU box stays hidden and everything else works like stock bpytop.
 
 ## The GPU box
 
 ![GPU box](https://raw.githubusercontent.com/amukherjee1991/bpytop-nv/main/docs/screenshots/gpu-only.png)
 
-Each NVIDIA GPU gets its own section with:
+Each GPU gets its own section with:
 
 - **Graphs**: GPU utilization on top and VRAM usage below, mirrored like the CPU graph.
 - **Stats**:
@@ -57,7 +60,21 @@ Each NVIDIA GPU gets its own section with:
   - performance state (`PST`, P0 is the highest)
 - **GPU processes** (on terminals at least 110 columns wide): PID, name, type, per-process GPU (SM) utilization and VRAM, sorted by VRAM. In the type column, `C` is compute, `G` is graphics and `B` is both.
 
-Systems with several GPUs get one section per GPU. Data comes straight from NVML, the NVIDIA Management Library, through `ctypes`.
+Systems with several GPUs get one section per GPU, mixed vendors included.
+
+### What each vendor shows
+
+| | NVIDIA | AMD Radeon | Apple Silicon |
+| --- | --- | --- | --- |
+| Source | NVML via `ctypes` | `amdgpu` sysfs and `/proc/*/fdinfo` | `ioreg` (IORegistry) |
+| GPU and memory use | ✓ | ✓ (VRAM) | ✓ (unified memory in use) |
+| Power, temperature, fan | ✓ | ✓ | – needs root |
+| Clocks | ✓ | ✓ | – needs root |
+| ENC / DEC | ✓ | ✓ from process stats | – |
+| PCIe, P-state | ✓ | – | – |
+| Processes | GPU% and VRAM | GPU% and VRAM | GPU% where macOS reports it |
+
+Lines with no data are left out of the stats box. AMD processes owned by other users only show up when bpytop-nv runs as root, the same as in nvtop.
 
 ## Views
 

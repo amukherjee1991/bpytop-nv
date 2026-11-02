@@ -4,7 +4,7 @@
 # tab-size = 4
 
 # Copyright 2021 Aristocratos (jakob@qvantnet.com)
-# Copyright 2026 Arghya Mukherjee (bpytop-nv: NVIDIA gpu monitoring additions)
+# Copyright 2026 Arghya Mukherjee (bpytop-nv: NVIDIA, AMD and Apple Silicon gpu monitoring additions)
 
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ if errors:
 		print("\nInstall required modules!\n")
 	raise SystemExit(1)
 
-VERSION: str = "26.10"
+VERSION: str = "26.11"
 BPYTOP_VERSION: str = "1.0.68"
 
 #? Argument parser ------------------------------------------------------------------------------->
@@ -2141,7 +2141,7 @@ class GpuBox(Box):
 			out += (f'{Mv.to(y, x)}{Graphs.gpu[n]["util"](None if cls.resized or cls.redraw else gpu["util"][-1])}'
 					f'{Mv.to(y + hh, x)}{Graphs.gpu[n]["mem"](None if cls.resized or cls.redraw else gpu["mem_p"][-1])}'
 					f'{Mv.to(y, x + 1)}{THEME.graph_text}{Fx.trans("GPU " + str(gpu["util"][-1]) + "%")}'
-					f'{Mv.to(y + h - 1, x + 1)}{THEME.graph_text}{Fx.trans("VRAM " + str(gpu["mem_p"][-1]) + "%")}')
+					f'{Mv.to(y + h - 1, x + 1)}{THEME.graph_text}{Fx.trans(gpu["mem_label"] + " " + str(gpu["mem_p"][-1]) + "%")}')
 
 			#* Stats sub box
 			lines: List[str] = []
@@ -2152,15 +2152,22 @@ class GpuBox(Box):
 				lines.append(f'{Fx.b}PWR {Fx.ub}{Meters.gpu[n]["power"](gpu["power_p"])}{THEME.main_fg}{gpu["power"]:>4}/{gpu["power_limit"]}W')
 			elif gpu["power"]:
 				lines.append(f'{Fx.b}PWR {Fx.ub}{gpu["power"]}W')
-			lines.append(f'{Fx.b}TMP {Fx.ub}{THEME.inactive_fg}⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][min_max(gpu["temp"][-1], 0, gpu["temp_max"]) * 100 // gpu["temp_max"]]}'
-				f'{Graphs.gpu[n]["temp"](None if cls.resized or cls.redraw else gpu["temp"][-1])}{temp:>4}{THEME.main_fg}{unit}'
-				+ (f'   {Fx.b}FAN {Fx.ub}{gpu["fan"]}%' if gpu["fan"] >= 0 else ""))
-			lines.append(f'{Fx.b}CLK {Fx.ub}{gpu["clk_gfx"]} MHz   {Fx.b}MEM {Fx.ub}{gpu["clk_mem"]} MHz')
-			lines.append(f'{Fx.b}ENC {Fx.ub}{gpu["enc"]:>3}%   {Fx.b}DEC {Fx.ub}{gpu["dec"]:>3}%')
+			if gpu["temp_ok"]:
+				lines.append(f'{Fx.b}TMP {Fx.ub}{THEME.inactive_fg}⡀⡀⡀⡀⡀{Mv.l(5)}{THEME.gradient["temp"][min_max(gpu["temp"][-1], 0, gpu["temp_max"]) * 100 // gpu["temp_max"]]}'
+					f'{Graphs.gpu[n]["temp"](None if cls.resized or cls.redraw else gpu["temp"][-1])}{temp:>4}{THEME.main_fg}{unit}'
+					+ (f'   {Fx.b}FAN {Fx.ub}{gpu["fan"]}%' if gpu["fan"] >= 0 else ""))
+			elif gpu["fan"] >= 0:
+				lines.append(f'{Fx.b}FAN {Fx.ub}{gpu["fan"]}%')
+			if gpu["clk_gfx"] or gpu["clk_mem"]:
+				lines.append(f'{Fx.b}CLK {Fx.ub}{gpu["clk_gfx"]} MHz   {Fx.b}MEM {Fx.ub}{gpu["clk_mem"]} MHz')
+			if gpu["enc"] >= 0:
+				lines.append(f'{Fx.b}ENC {Fx.ub}{gpu["enc"]:>3}%   {Fx.b}DEC {Fx.ub}{gpu["dec"]:>3}%')
 			if gpu["pcie_rx"] >= 0:
 				lines.append(f'{Fx.b}PCIe{Fx.ub} ▼ {floating_humanizer(gpu["pcie_rx"], per_second=True, short=True):<8} ▲ {floating_humanizer(gpu["pcie_tx"], per_second=True, short=True)}')
 			if gpu["pstate"] >= 0:
 				lines.append(f'{Fx.b}PST {Fx.ub}P{gpu["pstate"]}   {Fx.b}PROCS {Fx.ub}{len(gpu["procs"])}')
+			else:
+				lines.append(f'{Fx.b}PROCS {Fx.ub}{len(gpu["procs"])}')
 			for i in range(bh):
 				out += f'{Mv.to(by + i, bx)}{" " * bw}'
 				if i < len(lines): out += f'{Mv.to(by + i, bx)}{THEME.main_fg}{lines[i]}'
@@ -4308,86 +4315,379 @@ class Nvml:
 		return out
 
 
+class GpuDevice:
+	'''Base for one gpu of a backend, find() returns the gpus found at start and update() fills a GpuCollector.gpus dict'''
+	name: str = "Unknown GPU"
+	temp_max: int = 95
+	temp_ok: bool = True
+	mem_label: str = "VRAM"
+
+	@classmethod
+	def find(cls) -> List['GpuDevice']:
+		return []
+
+	@classmethod
+	def refresh(cls):
+		'''Called once per collection before update() of each gpu, for data shared between gpus of the same backend'''
+		pass
+
+	def update(self, gpu: Dict[str, Any]):
+		pass
+
+	@staticmethod
+	def push(gpu: Dict[str, Any], util: int, mem_used: int, mem_total: int, temp: int):
+		gpu["util"].append(min_max(util))
+		gpu["mem_p"].append(min_max(round(mem_used * 100 / mem_total)) if mem_total else 0)
+		gpu["temp"].append(max(temp, 0))
+		for key in ["util", "mem_p", "temp"]:
+			if len(gpu[key]) > Term.width * 4: del gpu[key][0]
+		gpu["mem_used"], gpu["mem_total"] = mem_used, mem_total
+
+	@staticmethod
+	def proc_name(pid: int) -> str:
+		try:
+			return psutil.Process(pid).name()
+		except Exception:
+			return "?"
+
+class NvidiaGpu(GpuDevice):
+	'''A NVIDIA gpu read through NVML'''
+	@classmethod
+	def find(cls) -> List[GpuDevice]:
+		if not Nvml.init():
+			errlog.info(f'No NVIDIA gpu support: {Nvml.error}')
+			return []
+		return [cls(n) for n in range(Nvml.device_count())]
+
+	def __init__(self, index: int):
+		self.handle = Nvml.handle(index)
+		self.last_seen: int = 0
+		self.name = Nvml.name(self.handle)
+		temp_max: int = Nvml.uint("nvmlDeviceGetTemperatureThreshold", self.handle, ctypes.c_int(1)) #* NVML_TEMPERATURE_THRESHOLD_SLOWDOWN
+		self.temp_max = temp_max if temp_max > 30 else 95
+
+	def update(self, gpu: Dict[str, Any]):
+		handle = self.handle
+		util, _ = Nvml.utilization(handle)
+		mem_used, mem_total = Nvml.memory(handle)
+		self.push(gpu, util, mem_used, mem_total, Nvml.uint("nvmlDeviceGetTemperature", handle, ctypes.c_int(0))) #* NVML_TEMPERATURE_GPU
+
+		power: int = Nvml.uint("nvmlDeviceGetPowerUsage", handle)
+		power_limit: int = Nvml.uint("nvmlDeviceGetEnforcedPowerLimit", handle)
+		gpu["power"] = power // 1000 if power > 0 else 0
+		gpu["power_limit"] = power_limit // 1000 if power_limit > 0 else 0
+		gpu["power_p"] = min_max(round(power * 100 / power_limit)) if power > 0 and power_limit > 0 else 0
+		gpu["fan"] = Nvml.uint("nvmlDeviceGetFanSpeed", handle)
+		gpu["clk_gfx"] = max(Nvml.uint("nvmlDeviceGetClockInfo", handle, ctypes.c_int(0)), 0) #* NVML_CLOCK_GRAPHICS
+		gpu["clk_mem"] = max(Nvml.uint("nvmlDeviceGetClockInfo", handle, ctypes.c_int(2)), 0) #* NVML_CLOCK_MEM
+		gpu["enc"] = Nvml.codec("nvmlDeviceGetEncoderUtilization", handle)
+		gpu["dec"] = Nvml.codec("nvmlDeviceGetDecoderUtilization", handle)
+		pcie_tx: int = Nvml.uint("nvmlDeviceGetPcieThroughput", handle, ctypes.c_int(0)) #* KB/s
+		pcie_rx: int = Nvml.uint("nvmlDeviceGetPcieThroughput", handle, ctypes.c_int(1))
+		gpu["pcie_tx"] = pcie_tx * 1024 if pcie_tx >= 0 else -1
+		gpu["pcie_rx"] = pcie_rx * 1024 if pcie_rx >= 0 else -1
+		gpu["pstate"] = Nvml.uint("nvmlDeviceGetPerformanceState", handle)
+		if gpu["pstate"] > 15: gpu["pstate"] = -1
+
+		#* Gpu processes, sorted by used gpu memory
+		sm_util: Dict[int, int] = Nvml.process_utilization(handle, self.last_seen)
+		self.last_seen = int((time() - CONFIG.update_ms / 1000) * 1000000)
+		procs: List[Dict[str, Any]] = []
+		for pid, (ptype, mem) in Nvml.processes(handle).items():
+			procs.append({"pid" : pid, "name" : self.proc_name(pid), "type" : ptype[0] if ptype != "C+G" else "B", "mem" : mem, "sm" : sm_util.get(pid, 0 if sm_util else -1)})
+		gpu["procs"] = sorted(procs, key=lambda p: (p["mem"], p["sm"]), reverse=True)
+
+class AmdGpu(GpuDevice):
+	'''An AMD Radeon gpu read from the amdgpu driver's sysfs files, gpu processes and codec load from the drm usage stats in /proc/*/fdinfo'''
+	sysfs: str = "/sys/class/drm"
+	proc: str = "/proc"
+	clients: Dict[Tuple[str, str], Dict[str, Any]] = {}
+	usage: Dict[str, Dict[str, Any]] = {}
+	last_time: float = 0.0
+
+	@classmethod
+	def find(cls) -> List[GpuDevice]:
+		out: List[GpuDevice] = []
+		try:
+			cards = sorted((c for c in os.listdir(cls.sysfs) if c.startswith("card") and c[4:].isdigit()), key=lambda c: int(c[4:]))
+		except OSError:
+			return out
+		for card in cards:
+			dev: str = f'{cls.sysfs}/{card}/device'
+			if cls._read(f'{dev}/vendor') != "0x1002" or not os.path.isfile(f'{dev}/gpu_busy_percent'): continue
+			out.append(cls(dev))
+		if not out: errlog.info("No AMD gpu found")
+		return out
+
+	def __init__(self, dev: str):
+		self.dev = dev
+		self.pdev: str = os.path.basename(os.path.realpath(dev))
+		self.name = self._read(f'{dev}/product_name') or self._pci_name(self._read(f'{dev}/device')[2:])
+		hwmons: List[str] = sorted(os.path.join(f'{dev}/hwmon', h) for h in os.listdir(f'{dev}/hwmon')) if os.path.isdir(f'{dev}/hwmon') else []
+		hw: str = hwmons[0] if hwmons else ""
+		self.hwmon = hw
+
+		#* Prefer the edge sensor, it is the one comparable to NVIDIA's core temperature
+		self.temp_file: str = ""
+		for i in range(1, 6):
+			if not os.path.isfile(f'{hw}/temp{i}_input'): continue
+			if not self.temp_file or self._read(f'{hw}/temp{i}_label') == "edge":
+				self.temp_file = f'{hw}/temp{i}_input'
+				crit: int = self._int(f'{hw}/temp{i}_crit') // 1000
+				self.temp_max = crit if 30 < crit < 150 else 95
+			if self._read(f'{hw}/temp{i}_label') == "edge": break
+		self.temp_ok = bool(self.temp_file)
+		self.power_file: str = next((f'{hw}/{f}' for f in ("power1_average", "power1_input") if os.path.isfile(f'{hw}/{f}')), "")
+		self.freq_files: Dict[str, str] = {}
+		for i in range(1, 4):
+			label: str = self._read(f'{hw}/freq{i}_label')
+			if label in ("sclk", "mclk"): self.freq_files[label] = f'{hw}/freq{i}_input'
+
+	@staticmethod
+	def _read(path: str) -> str:
+		try:
+			with open(path, "r", errors="ignore") as f: return f.read().strip()
+		except OSError:
+			return ""
+
+	@classmethod
+	def _int(cls, path: str) -> int:
+		'''Returns the integer in a sysfs file, -1 if missing'''
+		try:
+			return int(cls._read(path))
+		except ValueError:
+			return -1
+
+	@staticmethod
+	def _pci_name(device_id: str) -> str:
+		'''Look up the marketing name in pci.ids, "Navi 21 [Radeon RX 6800/6800 XT / 6900 XT]" gives "Radeon RX 6800/6800 XT / 6900 XT"'''
+		for path in ["/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids", "/usr/share/pci.ids"]:
+			try:
+				with open(path, "r", errors="ignore") as f:
+					in_amd: bool = False
+					for line in f:
+						if not in_amd:
+							in_amd = line.startswith("1002 ")
+						elif line.startswith("#") or line.startswith("\t\t") or not line.strip():
+							continue
+						elif line.startswith("\t"):
+							if line[1:5].lower() == device_id.lower():
+								name: str = line[5:].strip()
+								if "[" in name and name.endswith("]"): name = name[name.rindex("[") + 1:-1]
+								return name.replace("AMD ", "")
+						else:
+							break
+			except OSError:
+				continue
+		return "Radeon GPU"
+
+	@staticmethod
+	def _size(value: str) -> int:
+		'''Parse a drm fdinfo memory value like "1234 KiB" into bytes'''
+		parts = value.split()
+		if not parts or not parts[0].isdigit(): return -1
+		return int(parts[0]) * {"KiB" : 1024, "MiB" : 1048576, "GiB" : 1073741824}.get(parts[1] if len(parts) > 1 else "", 1)
+
+	@classmethod
+	def refresh(cls):
+		'''Read the drm usage stats of every open amdgpu file, they hold cumulative busy time per engine and memory per client'''
+		now: float = time()
+		clients: Dict[Tuple[str, str], Dict[str, Any]] = {}
+		try:
+			pids = [p for p in os.listdir(cls.proc) if p.isdigit()]
+		except OSError:
+			pids = []
+		for pid in pids:
+			try:
+				fds = os.listdir(f'{cls.proc}/{pid}/fd')
+			except OSError:
+				continue
+			for fd in fds:
+				try:
+					if not os.readlink(f'{cls.proc}/{pid}/fd/{fd}').startswith("/dev/dri/"): continue
+					with open(f'{cls.proc}/{pid}/fdinfo/{fd}', "r", errors="ignore") as f:
+						fields: Dict[str, str] = dict(line.split(":", 1) for line in f.read().splitlines() if ":" in line)
+				except (OSError, ValueError):
+					continue
+				fields = {k.strip() : v.strip() for k, v in fields.items()}
+				if fields.get("drm-driver") != "amdgpu": continue
+				key: Tuple[str, str] = (fields.get("drm-pdev", ""), fields.get("drm-client-id", ""))
+				if not key[1] or key in clients: continue
+				engines: Dict[str, int] = {}
+				for name, value in fields.items():
+					if name.startswith("drm-engine-") and not name.startswith("drm-engine-capacity-") and value.split()[0].isdigit():
+						engines[name[11:]] = int(value.split()[0])
+				clients[key] = {"pid" : int(pid), "engines" : engines,
+					"mem" : cls._size(fields.get("drm-memory-vram") or fields.get("drm-resident-vram") or "")}
+
+		#* Turn busy time deltas since the last collection into percentages per process and per engine type
+		elapsed: float = (now - cls.last_time) * 1000000000 if cls.last_time else 0
+		usage: Dict[str, Dict[str, Any]] = {}
+		for (pdev, cid), c in clients.items():
+			dev = usage.setdefault(pdev, {"procs" : {}, "enc" : 0.0, "dec" : 0.0})
+			prev = cls.clients.get((pdev, cid))
+			delta: Dict[str, int] = {e : max(ns - prev["engines"].get(e, 0), 0) for e, ns in c["engines"].items()} if prev and elapsed else {}
+			for e, ns in delta.items():
+				if e.startswith("enc"): dev["enc"] += ns * 100 / elapsed
+				elif e.startswith("dec"): dev["dec"] += ns * 100 / elapsed
+			gfx: bool = c["engines"].get("gfx", 0) > 0
+			compute: bool = c["engines"].get("compute", 0) > 0
+			ptype: str = "B" if gfx and compute else "C" if compute else "G"
+			util: int = round((delta.get("gfx", 0) + delta.get("compute", 0)) * 100 / elapsed) if delta else -1
+			p = dev["procs"].get(c["pid"])
+			if p:
+				p["mem"] = max(p["mem"], 0) + max(c["mem"], 0) if p["mem"] >= 0 or c["mem"] >= 0 else -1
+				p["sm"] = max(p["sm"], 0) + util if util >= 0 else p["sm"]
+				if p["type"] != ptype: p["type"] = "B"
+			else:
+				dev["procs"][c["pid"]] = {"pid" : c["pid"], "type" : ptype, "mem" : c["mem"], "sm" : util}
+		cls.clients, cls.usage, cls.last_time = clients, usage, now
+
+	def update(self, gpu: Dict[str, Any]):
+		dev, hw = self.dev, self.hwmon
+		self.push(gpu, self._int(f'{dev}/gpu_busy_percent'), max(self._int(f'{dev}/mem_info_vram_used'), 0), max(self._int(f'{dev}/mem_info_vram_total'), 0),
+			self._int(self.temp_file) // 1000 if self.temp_file else 0)
+
+		power: int = self._int(self.power_file) if self.power_file else -1 #* microwatts
+		power_limit: int = self._int(f'{hw}/power1_cap')
+		gpu["power"] = power // 1000000 if power > 0 else 0
+		gpu["power_limit"] = power_limit // 1000000 if power_limit > 0 else 0
+		gpu["power_p"] = min_max(round(power * 100 / power_limit)) if power > 0 and power_limit > 0 else 0
+		pwm, pwm_max = self._int(f'{hw}/pwm1'), self._int(f'{hw}/pwm1_max')
+		gpu["fan"] = round(pwm * 100 / (pwm_max if pwm_max > 0 else 255)) if pwm >= 0 else -1
+		gpu["clk_gfx"] = max(self._int(self.freq_files["sclk"]) // 1000000, 0) if "sclk" in self.freq_files else self._dpm_clock("pp_dpm_sclk")
+		gpu["clk_mem"] = max(self._int(self.freq_files["mclk"]) // 1000000, 0) if "mclk" in self.freq_files else self._dpm_clock("pp_dpm_mclk")
+
+		usage: Dict[str, Any] = self.usage.get(self.pdev, {"procs" : {}, "enc" : 0, "dec" : 0})
+		gpu["enc"] = min_max(round(usage["enc"]))
+		gpu["dec"] = min_max(round(usage["dec"]))
+		procs: List[Dict[str, Any]] = [dict(p, name=self.proc_name(p["pid"]), sm=min(p["sm"], 100)) for p in usage["procs"].values()]
+		gpu["procs"] = sorted(procs, key=lambda p: (p["mem"], p["sm"]), reverse=True)
+
+	def _dpm_clock(self, file: str) -> int:
+		'''The active clock level in pp_dpm_*clk is marked with a "*", like "1: 2100Mhz *"'''
+		for line in self._read(f'{self.dev}/{file}').splitlines():
+			if line.endswith("*"):
+				value: str = line.split()[1].lower().replace("mhz", "") if len(line.split()) > 1 else ""
+				return int(value) if value.isdigit() else 0
+		return 0
+
+class AppleGpu(GpuDevice):
+	'''An Apple Silicon gpu read from the IORegistry with ioreg, no root needed.
+	Power, temperature and clocks are only exposed to root (powermetrics), so they are not shown'''
+	mem_label: str = "MEM"
+	temp_ok: bool = False
+	entries: List[Dict[str, Any]] = []
+	gpu_time: Dict[int, int] = {}
+	last_time: float = 0.0
+
+	@classmethod
+	def find(cls) -> List[GpuDevice]:
+		if SYSTEM != "MacOS" or not which("ioreg"): return []
+		cls.refresh()
+		return [cls(n) for n in range(len(cls.entries))]
+
+	def __init__(self, index: int):
+		self.index = index
+		entry: Dict[str, Any] = self.entries[index]
+		self.name = str(entry.get("model", "Apple GPU")).replace("Apple ", "")
+		if entry.get("gpu-core-count"): self.name += f' {entry["gpu-core-count"]}-core'
+
+	@classmethod
+	def refresh(cls):
+		try:
+			import plistlib
+			data = plistlib.loads(subprocess.run(["ioreg", "-a", "-r", "-c", "IOAccelerator"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5).stdout)
+		except Exception as e:
+			errlog.info(f'ioreg failed: {e}')
+			data = []
+		if isinstance(data, dict): data = [data]
+		cls.entries = [e for e in data if isinstance(e, dict) and isinstance(e.get("PerformanceStatistics"), dict)]
+
+	@staticmethod
+	def _clients(entry: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+		'''Walk the user clients below the accelerator, each one is a process holding the gpu'''
+		for child in entry.get("IORegistryEntryChildren", []):
+			if not isinstance(child, dict): continue
+			if "IOUserClientCreator" in child: yield child
+			yield from AppleGpu._clients(child)
+
+	def update(self, gpu: Dict[str, Any]):
+		if self.index >= len(self.entries): return
+		entry: Dict[str, Any] = self.entries[self.index]
+		stats: Dict[str, Any] = entry["PerformanceStatistics"]
+		self.push(gpu, int(stats.get("Device Utilization %", 0)), int(stats.get("In use system memory", 0)), psutil.virtual_memory().total, 0)
+		gpu["enc"] = gpu["dec"] = -1
+
+		#* Processes from "pid 123, name" in IOUserClientCreator, gpu time from AppUsage where macOS provides it
+		now: float = time()
+		elapsed: float = (now - AppleGpu.last_time) * 1000000000 if AppleGpu.last_time else 0
+		gpu_time: Dict[int, int] = {}
+		names: Dict[int, str] = {}
+		for client in self._clients(entry):
+			creator: str = str(client["IOUserClientCreator"])
+			if not creator.startswith("pid "): continue
+			pid_s, _, pname = creator[4:].partition(", ")
+			if not pid_s.isdigit(): continue
+			pid: int = int(pid_s)
+			names[pid] = pname or self.proc_name(pid)
+			for usage in client.get("AppUsage", []) if isinstance(client.get("AppUsage"), list) else []:
+				if isinstance(usage, dict) and isinstance(usage.get("accumulatedGPUTime"), int):
+					gpu_time[pid] = gpu_time.get(pid, 0) + usage["accumulatedGPUTime"]
+		procs: List[Dict[str, Any]] = []
+		for pid, pname in names.items():
+			util: int = -1
+			if pid in gpu_time and pid in AppleGpu.gpu_time and elapsed:
+				util = min_max(round((gpu_time[pid] - AppleGpu.gpu_time[pid]) * 100 / elapsed))
+			procs.append({"pid" : pid, "name" : pname, "type" : "G", "mem" : -1, "sm" : util})
+		AppleGpu.gpu_time, AppleGpu.last_time = gpu_time, now
+		gpu["procs"] = sorted(procs, key=lambda p: p["sm"], reverse=True)
+
 class GpuCollector(Collector):
-	'''Collects gpu utilization, memory, temperature, power, clocks, codec usage, pcie throughput and gpu processes using NVML'''
+	'''Collects gpu utilization, memory, temperature, power, clocks, codec usage, pcie throughput and gpu processes.
+	NVIDIA gpus are read through NVML, AMD gpus from amdgpu sysfs and Apple Silicon from the IORegistry'''
 	gpus: List[Dict[str, Any]] = []
-	handles: List[Any] = []
-	last_seen: List[int] = []
+	devices: List[GpuDevice] = []
+	backends: List[Any] = [NvidiaGpu, AmdGpu, AppleGpu]
 	buffer: str = GpuBox.buffer
 	redraw: bool = False
 
 	@classmethod
 	def get_gpus(cls):
-		'''Find NVIDIA gpus, called once at start'''
+		'''Find gpus of all backends, called once at start'''
 		cls.gpus = []
-		cls.handles = []
-		if not Nvml.init():
-			errlog.info(f'No NVIDIA gpu support: {Nvml.error}')
-			return
-		try:
-			for n in range(Nvml.device_count()):
-				handle = Nvml.handle(n)
-				temp_max: int = Nvml.uint("nvmlDeviceGetTemperatureThreshold", handle, ctypes.c_int(1)) #* NVML_TEMPERATURE_THRESHOLD_SLOWDOWN
-				cls.handles.append(handle)
-				cls.last_seen.append(0)
+		cls.devices = []
+		for backend in cls.backends:
+			try:
+				found: List[GpuDevice] = backend.find()
+			except Exception as e:
+				errlog.exception(f'Failed getting {backend.__name__} info: {e}')
+				continue
+			for dev in found:
+				cls.devices.append(dev)
 				cls.gpus.append({
-					"name" : Nvml.name(handle),
+					"name" : dev.name,
 					"util" : [0], "mem_p" : [0], "temp" : [0],
-					"temp_max" : temp_max if temp_max > 30 else 95,
+					"temp_max" : dev.temp_max, "temp_ok" : dev.temp_ok, "mem_label" : dev.mem_label,
 					"mem_used" : 0, "mem_total" : 0,
 					"power" : 0, "power_limit" : 0, "power_p" : 0,
 					"fan" : -1, "clk_gfx" : 0, "clk_mem" : 0,
 					"enc" : 0, "dec" : 0, "pcie_rx" : -1, "pcie_tx" : -1, "pstate" : -1,
 					"procs" : [],
 				})
-		except Exception as e:
-			errlog.exception(f'Failed getting gpu info: {e}')
-			cls.gpus = []
-			cls.handles = []
 
 	@classmethod
 	def _collect(cls):
 		if not cls.gpus or not "gpu" in Box.boxes: return
-		for n, handle in enumerate(cls.handles):
-			gpu = cls.gpus[n]
-			util, _ = Nvml.utilization(handle)
-			mem_used, mem_total = Nvml.memory(handle)
-			temp: int = Nvml.uint("nvmlDeviceGetTemperature", handle, ctypes.c_int(0)) #* NVML_TEMPERATURE_GPU
-			gpu["util"].append(min_max(util))
-			gpu["mem_p"].append(round(mem_used * 100 / mem_total) if mem_total else 0)
-			gpu["temp"].append(max(temp, 0))
-			for key in ["util", "mem_p", "temp"]:
-				if len(gpu[key]) > Term.width * 4: del gpu[key][0]
-			gpu["mem_used"], gpu["mem_total"] = mem_used, mem_total
-
-			power: int = Nvml.uint("nvmlDeviceGetPowerUsage", handle)
-			power_limit: int = Nvml.uint("nvmlDeviceGetEnforcedPowerLimit", handle)
-			gpu["power"] = power // 1000 if power > 0 else 0
-			gpu["power_limit"] = power_limit // 1000 if power_limit > 0 else 0
-			gpu["power_p"] = min_max(round(power * 100 / power_limit)) if power > 0 and power_limit > 0 else 0
-			gpu["fan"] = Nvml.uint("nvmlDeviceGetFanSpeed", handle)
-			gpu["clk_gfx"] = max(Nvml.uint("nvmlDeviceGetClockInfo", handle, ctypes.c_int(0)), 0) #* NVML_CLOCK_GRAPHICS
-			gpu["clk_mem"] = max(Nvml.uint("nvmlDeviceGetClockInfo", handle, ctypes.c_int(2)), 0) #* NVML_CLOCK_MEM
-			gpu["enc"] = Nvml.codec("nvmlDeviceGetEncoderUtilization", handle)
-			gpu["dec"] = Nvml.codec("nvmlDeviceGetDecoderUtilization", handle)
-			pcie_tx: int = Nvml.uint("nvmlDeviceGetPcieThroughput", handle, ctypes.c_int(0)) #* KB/s
-			pcie_rx: int = Nvml.uint("nvmlDeviceGetPcieThroughput", handle, ctypes.c_int(1))
-			gpu["pcie_tx"] = pcie_tx * 1024 if pcie_tx >= 0 else -1
-			gpu["pcie_rx"] = pcie_rx * 1024 if pcie_rx >= 0 else -1
-			gpu["pstate"] = Nvml.uint("nvmlDeviceGetPerformanceState", handle)
-			if gpu["pstate"] > 15: gpu["pstate"] = -1
-
-			#* Gpu processes, sorted by used gpu memory
-			sm_util: Dict[int, int] = Nvml.process_utilization(handle, cls.last_seen[n])
-			cls.last_seen[n] = int((time() - CONFIG.update_ms / 1000) * 1000000)
-			procs: List[Dict[str, Any]] = []
-			for pid, (ptype, mem) in Nvml.processes(handle).items():
-				try:
-					pname: str = psutil.Process(pid).name()
-				except Exception:
-					pname = "?"
-				procs.append({"pid" : pid, "name" : pname, "type" : ptype[0] if ptype != "C+G" else "B", "mem" : mem, "sm" : sm_util.get(pid, 0 if sm_util else -1)})
-			gpu["procs"] = sorted(procs, key=lambda p: (p["mem"], p["sm"]), reverse=True)
+		for backend in cls.backends:
+			if any(isinstance(dev, backend) for dev in cls.devices):
+				try: backend.refresh()
+				except Exception as e: errlog.exception(f'{backend.__name__} refresh failed: {e}')
+		for n, dev in enumerate(cls.devices):
+			try:
+				dev.update(cls.gpus[n])
+			except Exception as e:
+				errlog.exception(f'Failed collecting gpu {n}: {e}')
 
 	@classmethod
 	def _draw(cls):
